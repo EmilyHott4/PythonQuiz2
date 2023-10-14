@@ -1,58 +1,49 @@
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score
-
-with open('animals_train.txt') as f:
-    lines = [line.strip() for line in f]
-   
-feature = lines[0].split(',')
-data = [[int(item) for item in items.split(',')] for items in lines[1:]]
-animals_train = pd.DataFrame(data, columns = feature)
-print('Shape: ',animals_train.shape)
-animals_train.head()
-
-with open('animals_test.txt') as f:
-    lines = [line.strip() for line in f]
-   
-feature = lines[0].split(',')[1:]
-data = [[int(item) for item in items.split(',')[1:]] for items in lines[1:]]
-animal_name = [item.split(',')[:1][0] for item in lines[1:]]
-animals_test = pd.DataFrame(data, columns = feature)
-animals_test['animal_name'] = animal_name
-animals_test.head()
 
 
-# reading the file
-with open('Classes.txt') as f:
-    lines = [line.strip() for line in f]
-   
-features = lines[0].split(',')[1:]
-data1 = [item.split(',')[:3] for item in lines[1:]]
-data2 = [item.split(',')[3:] for item in lines[1:]]
-Classes = pd.DataFrame(data1,columns=features)
-Classes['Animal_Names'] = data2
-Classes
+data=pd.read_csv('animals_train.csv')
+test_d=pd.read_csv('animals_test.csv')
+resutls=pd.read_csv('Classes.csv')
+feature_cols = ['hair','feathers','eggs','milk','airborne','aquatic','predator','toothed','backbone','breathes','venomous','fins','legs','tail','domestic','catsize','class_number']
+featurecols = ['hair','feathers','eggs','milk','airborne','aquatic','predator','toothed','backbone','breathes','venomous','fins','legs','tail','domestic','catsize',]
 
+x_data = data[feature_cols] 
+y_data = data.label
+xdata = test_d[featurecols] 
+ydata = test_d.label
 
-# reading the file
-with open('predictions.txt') as f:
-    lines = [line.strip() for line in f]
-   
-features = lines[0].split(',')
-data = [item.split(',') for item in lines[1:]]
-predictions = pd.DataFrame(data,columns=features)
-predictions.head()
+X_train, X_test, y_train, y_test = train_test_split(x_data, y_data, test_size=0.01, random_state=42)
+Xtrain, X_test, ytrain, y_test = train_test_split(xdata, ydata, test_size=0.99, random_state=42)
 
+columns=list(x_data.colums)
+onehot= OneHotEncoder()
+clt = ColumnTransformer([('binarize',onehot,columns)], remainder='passthrough')
 
-X_train = animals_train.iloc[:,:-1].values
-y_train = animals_train.iloc[:,-1:].values
-X_test = animals_test.iloc[:,:-1].values
+X_train=clt.fit_transform(X_train)
 
-clf = KNeighborsClassifier(n_neighbors=5).fit(X_train, y_train)
+X_test=clt.transform(X_test)
 
-y_pred = clf.predict(X_test)
-animals_test['predicted'] = y_pred
-animals_test = animals_test[['animal_name','predicted']]
-# saving to disk
-animals_test.to_csv('animals_test.csv', index=False)
-animals_test.head()
+## using KNN
+test_score=[]
+for i in range(1,30):
+    knn=KNeighborsClassifier(n_neighbors=i)
+    knn.fit(X_train, y_train)
+    y_hat=knn.predict(X_test)
+    score= 1-accuracy_score(y_test,y_hat)
+    test_score.append(score)
+
+Nval=list(range(1,40))
+param_grid={'n_neighbors':Nval}
+model = GridSearchCV(knn,param_grid=param_grid, cv=10, scoring='accuracy')
+
+model.fit(X_train,y_train)
+grid_cv_predict = model.predict(X_test)
+print(accuracy_score(y_test,pred),'\n')
+
+for i in resutls:
+    if grid_cv_predict==i.Class_Number[0]:
+        print(i)
